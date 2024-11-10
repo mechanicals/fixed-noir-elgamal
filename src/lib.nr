@@ -22,8 +22,8 @@ pub fn get_base_point() -> Gaffine {
 
 // Returns true if x is less than y
 fn lt_bytes32(x: Field, y: Field) -> bool {
-    let x_bytes = x.to_le_bytes(32);
-    let y_bytes = y.to_le_bytes(32);
+    let x_bytes:[u8; 32] = x.to_le_bytes();
+    let y_bytes:[u8; 32] = y.to_le_bytes();
     let mut x_is_lt = false;
     let mut done = false;
     for i in 0..32 {
@@ -64,7 +64,7 @@ pub fn priv_to_pub_key(private_key: Field) -> Gaffine
 /// The randomness parameter should be sampled uniformly between 0 and bjj_l-1 and NEVER reused. bjj_l is the order of the big prime subgroup of Baby Jubjub.
 /// Same notations as in https://en.wikipedia.org/wiki/ElGamal_encryption 
 /// The public_key point passed as an argument must correspond to a valid public key, i.e an element of the Baby Jubjub curve
-pub fn exp_elgamal_encrypt(public_key: Gaffine, plaintext: u40, randomness: Field) -> (Gaffine,Gaffine)
+pub fn exp_elgamal_encrypt(public_key: Gaffine, plaintext: u32, randomness: Field) -> (Gaffine,Gaffine)
 {
   assert(is_valid_subgroup(public_key)); // checks the public key is valid
   let bjj_affine = get_affine_curve();
@@ -94,7 +94,7 @@ pub fn pack_point(public_key: Gaffine) -> [u8;32] {
   assert(is_valid_subgroup(public_key), "The public key is not a point on the Baby Jubjub big subgroup"); // checks the public key is valid
 
   let mut array: [u8;32] = [0;32];
-  let mut y = public_key.y.to_le_bytes(32);
+  let mut y: [u8; 32] = public_key.y.to_le_bytes();
   for i in 0..32 {
     array[i] = y[i];
   }
@@ -122,7 +122,7 @@ pub fn unpack_point(public_key: [u8; 32]) -> Gaffine
   }
 
   point.y = from_rpr_le(y_array);
-  let recovered_y_slice = point.y.to_le_bytes(32); 
+  let recovered_y_slice: [u8; 32] = point.y.to_le_bytes(); 
   let mut recovered_y_array: [u8;32] = [0;32];
   for i in 0..32 {
      recovered_y_array[i]=recovered_y_slice[i];
@@ -149,7 +149,7 @@ pub fn unpack_point(public_key: [u8; 32]) -> Gaffine
 
 /// Same as exp_elgamal_encrypt but instead of an upacked public_key, takes directly the packed public key as an argument
 /// Saves gates because the validity of the public key is checked only once instead of twice (1st when using unpack_point and 2nd in exp_elgamal_encrypt)
-pub fn exp_elgamal_encrypt_packed(packed_public_key: [u8; 32], plaintext: u40, randomness: Field) -> (Gaffine,Gaffine)
+pub fn exp_elgamal_encrypt_packed(packed_public_key: [u8; 32], plaintext: u32, randomness: Field) -> (Gaffine,Gaffine)
 {
   let mut y_array = packed_public_key;
   let mut public_key: Gaffine = Gaffine::new(0,0);
@@ -160,7 +160,7 @@ pub fn exp_elgamal_encrypt_packed(packed_public_key: [u8; 32], plaintext: u40, r
   }
 
   public_key.y = from_rpr_le(y_array);
-  let recovered_y_slice = public_key.y.to_le_bytes(32); 
+  let recovered_y_slice: [u8; 32]= public_key.y.to_le_bytes(); 
   let mut recovered_y_array: [u8;32] = [0;32];
   for i in 0..32 {
      recovered_y_array[i]=recovered_y_slice[i];
@@ -206,7 +206,7 @@ fn from_rpr_le(public_key: [u8;32]) -> Field {
 
 #[test]
 fn test_main() {
-  let message: u40 = 943594123598;
+  let message: u32 = 943594123;
   let private_key: Field = 0x04c330a81537c0d29cc09e8b2b9c43fc5fb5a9d244ab741fc88dff3d40dbd75c; // chosen randomly between 0 and bjj_l-1
   let randomness: Field = 0x010fe5884a7852054a21e21e549520352f563f03d3f79e66a2d75fbd2a21d5cf; // chosen randomly between 0 and bjj_l-1, and never reused
 
@@ -265,7 +265,7 @@ fn test_packed_key_unicity(){
 
   let valid_packed_public_key = pack_point(pub_key);
   
-  /// Computing a different packed public key which should not be valid, by adding p to the y coordinate :
+  // Computing a different packed public key which should not be valid, by adding p to the y coordinate :
   // Previosuly could be computed when we imported BigUint via : 
   // let pBig = (BigUint56::from_bytes((-1).to_le_bytes(32)).add(BigUint56::from_bytes((1).to_le_bytes(32))));
   // let yPluspBig = BigUint56::from_bytes(pub_key.y.to_le_bytes(32)).add(pBig); // A user tries to cheat by generating an invalid packed public key by adding p to y
@@ -282,7 +282,7 @@ fn test_packed_key_unicity(){
     invalid_packed_public_key[31] = invalid_packed_public_key[31] | 0x80;
   }
   
-  assert(valid_packed_public_key!=invalid_packed_public_key); /// checks that the newly computed packed public key is different from the original one
+  assert(valid_packed_public_key!=invalid_packed_public_key); // checks that the newly computed packed public key is different from the original one
   assert((unpack_point(valid_packed_public_key).x==pub_key.x) & (unpack_point(valid_packed_public_key).y==pub_key.y)); // this should succeed
   assert((unpack_point(invalid_packed_public_key).x==pub_key.x) & (unpack_point(invalid_packed_public_key).y==pub_key.y)); // this should fail with `The packed public key is invalid`
 
@@ -290,7 +290,7 @@ fn test_packed_key_unicity(){
 
 #[test]
 fn test_encrypt(){
-  let x: u40 = 5;
+  let x: u32 = 5;
   let bjj_affine = get_affine_curve();
   let base_pt = get_base_point();
   let embedded_x = bjj_affine.mul(x as Field, base_pt);
@@ -318,7 +318,7 @@ fn test_encrypt(){
 
 #[test]
 fn test_encrypt_packed(){
-  let x: u40 = 5;
+  let x: u32 = 5;
   let bjj_affine = get_affine_curve();
   let base_pt = get_base_point();
   let embedded_x = bjj_affine.mul(x as Field, base_pt);
